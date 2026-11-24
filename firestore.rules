@@ -1,0 +1,687 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all (zero trust baseline)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptionalString(data, key, maxLen) {
+      return !(key in data) || (data[key] is string && data[key].size() <= maxLen);
+    }
+
+    function isOptionalNumber(data, key) {
+      return !(key in data) || data[key] is number;
+    }
+
+    function isOptionalInt(data, key) {
+      return !(key in data) || data[key] is int;
+    }
+
+    function isOptionalBool(data, key) {
+      return !(key in data) || data[key] is bool;
+    }
+
+    function hasValidTimestampsOnCreate(data) {
+      return data.createdAt is timestamp &&
+        data.createdAt <= request.time &&
+        data.updatedAt is timestamp &&
+        data.updatedAt <= request.time;
+    }
+
+    function hasValidTimestampsOnUpdate(data) {
+      return data.createdAt is timestamp &&
+        data.createdAt == existing().createdAt &&
+        data.updatedAt is timestamp &&
+        data.updatedAt <= request.time;
+    }
+
+    function isValidSyncMeta(data, userId) {
+      return data.userId == userId &&
+        data.clientUpdatedAtMillis is int &&
+        data.clientUpdatedAtMillis >= 0 &&
+        data.version is int &&
+        data.version >= 1;
+    }
+
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll(['userId', 'displayName', 'email', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'lastActiveDevice', 'createdAt', 'updatedAt']) &&
+        data.userId == userId &&
+        isValidString(data.displayName, 1, 200) &&
+        isValidString(data.email, 3, 320) &&
+        isOptionalString(data, 'photoUrl', 2048) &&
+        isOptionalString(data, 'lastActiveDevice', 200);
+    }
+
+    function isValidCustomer(data, userId) {
+      let requiredKeys = ['userId', 'localId', 'namaLengkap', 'nomorHp', 'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'];
+      let allowedKeys = [
+        'userId', 'localId', 'kodePelanggan', 'namaLengkap', 'nik', 'nomorHp', 'alamatLengkap',
+        'jenisKelamin', 'tempatLahir', 'tanggalLahir', 'rtRw', 'kelurahanDesa', 'kecamatan',
+        'kabupatenKota', 'agama', 'statusPerkawinan', 'pekerjaan', 'kewarganegaraan', 'berlakuHingga',
+        'namaLokasiDefault', 'lokasiPenggunaanDefault', 'latitudeDefault', 'longitudeDefault',
+        'linkGoogleMapsDefault', 'statusPelanggan', 'statusVerifikasiAdminOcr', 'tanggalRegistrasi',
+        'catatan', 'fotoKtpDepanUrl', 'fotoKtpBelakangUrl', 'fotoPelangganUrl',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.localId is int && data.localId >= 0 &&
+        isValidString(data.namaLengkap, 1, 300) &&
+        isValidString(data.nomorHp, 0, 80) &&
+        isOptionalString(data, 'kodePelanggan', 100) &&
+        isOptionalString(data, 'nik', 64) &&
+        isOptionalString(data, 'alamatLengkap', 2048) &&
+        isOptionalString(data, 'jenisKelamin', 40) &&
+        isOptionalString(data, 'tempatLahir', 150) &&
+        isOptionalString(data, 'tanggalLahir', 40) &&
+        isOptionalString(data, 'rtRw', 40) &&
+        isOptionalString(data, 'kelurahanDesa', 150) &&
+        isOptionalString(data, 'kecamatan', 150) &&
+        isOptionalString(data, 'kabupatenKota', 150) &&
+        isOptionalString(data, 'agama', 60) &&
+        isOptionalString(data, 'statusPerkawinan', 60) &&
+        isOptionalString(data, 'pekerjaan', 150) &&
+        isOptionalString(data, 'kewarganegaraan', 40) &&
+        isOptionalString(data, 'berlakuHingga', 60) &&
+        isOptionalString(data, 'namaLokasiDefault', 300) &&
+        isOptionalString(data, 'lokasiPenggunaanDefault', 2048) &&
+        isOptionalNumber(data, 'latitudeDefault') &&
+        isOptionalNumber(data, 'longitudeDefault') &&
+        isOptionalString(data, 'linkGoogleMapsDefault', 2048) &&
+        isOptionalString(data, 'statusPelanggan', 80) &&
+        isOptionalString(data, 'statusVerifikasiAdminOcr', 80) &&
+        isOptionalString(data, 'tanggalRegistrasi', 40) &&
+        isOptionalString(data, 'catatan', 5000) &&
+        isOptionalString(data, 'fotoKtpDepanUrl', 2048) &&
+        isOptionalString(data, 'fotoKtpBelakangUrl', 2048) &&
+        isOptionalString(data, 'fotoPelangganUrl', 2048);
+    }
+
+    function isValidFreezerUnit(data, userId) {
+      let requiredKeys = ['userId', 'localId', 'kodeUnit', 'namaUnit', 'statusUnit', 'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'];
+      let allowedKeys = [
+        'userId', 'localId', 'kodeUnit', 'namaUnit', 'jenisUnit', 'owner', 'hargaPembelian',
+        'kapasitasLiter', 'cicilanPerBulan', 'jumlahCicilanTotal', 'totalPembayaranCicilan',
+        'statusInvestasi', 'kategoriSheet', 'merek', 'model', 'nomorSeri', 'statusUnit',
+        'lokasiUnit', 'tanggalPembelian', 'keterangan', 'kondisiUnit', 'tanggalPengiriman',
+        'lokasiGpsPemasangan', 'latitudePemasangan', 'longitudePemasangan', 'fotoUnitUrl',
+        'fotoKondisiFisikUrl', 'fotoBagianDalamUrl', 'fotoMerekSeriUrl',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.localId is int && data.localId >= 0 &&
+        isValidString(data.kodeUnit, 1, 100) &&
+        isValidString(data.namaUnit, 1, 250) &&
+        isValidString(data.statusUnit, 1, 100) &&
+        isOptionalString(data, 'jenisUnit', 120) &&
+        isOptionalString(data, 'owner', 200) &&
+        isOptionalInt(data, 'hargaPembelian') &&
+        isOptionalInt(data, 'kapasitasLiter') &&
+        isOptionalInt(data, 'cicilanPerBulan') &&
+        isOptionalInt(data, 'jumlahCicilanTotal') &&
+        isOptionalInt(data, 'totalPembayaranCicilan') &&
+        isOptionalString(data, 'statusInvestasi', 80) &&
+        isOptionalString(data, 'kategoriSheet', 150) &&
+        isOptionalString(data, 'merek', 150) &&
+        isOptionalString(data, 'model', 150) &&
+        isOptionalString(data, 'nomorSeri', 150) &&
+        isOptionalString(data, 'lokasiUnit', 500) &&
+        isOptionalString(data, 'tanggalPembelian', 40) &&
+        isOptionalString(data, 'keterangan', 5000) &&
+        isOptionalString(data, 'kondisiUnit', 150) &&
+        isOptionalString(data, 'tanggalPengiriman', 40) &&
+        isOptionalString(data, 'lokasiGpsPemasangan', 500) &&
+        isOptionalNumber(data, 'latitudePemasangan') &&
+        isOptionalNumber(data, 'longitudePemasangan') &&
+        isOptionalString(data, 'fotoUnitUrl', 2048) &&
+        isOptionalString(data, 'fotoKondisiFisikUrl', 2048) &&
+        isOptionalString(data, 'fotoBagianDalamUrl', 2048) &&
+        isOptionalString(data, 'fotoMerekSeriUrl', 2048);
+    }
+
+    function isValidRentalTransaction(data, userId) {
+      let requiredKeys = [
+        'userId', 'localId', 'nomorInvoice', 'customerId', 'unitId',
+        'totalTagihan', 'statusPembayaran', 'statusPenyewaan',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'localId', 'nomorInvoice', 'tanggalPemesanan', 'customerId', 'customerCloudId',
+        'namaPelangganSnapshot', 'unitId', 'unitCloudId', 'namaUnitSnapshot', 'kodeUnitSnapshot',
+        'hargaSewa', 'durasiSewaBulan', 'durasiHari', 'tanggalMulaiSewa', 'tanggalAkhirSewa',
+        'tanggalJatuhTempo', 'nominalPembayaran', 'ongkir', 'deposit', 'diskon', 'totalTagihan',
+        'statusPembayaran', 'statusPenyewaan', 'metodePembayaran', 'catatan',
+        'namaLokasiUsaha', 'alamatLokasiGps', 'latitude', 'longitude', 'akurasiGpsMeter',
+        'linkGoogleMaps', 'jenisProgram', 'totalPeriodeHakMilik', 'pembayaranKeHakMilik',
+        'statusProgramHakMilik', 'isiPerjanjianSewaSnapshot', 'pdfInvoicePath',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.localId is int && data.localId >= 0 &&
+        data.customerId is int && data.unitId is int &&
+        data.totalTagihan is int && data.totalTagihan >= 0 &&
+        isValidString(data.nomorInvoice, 1, 120) &&
+        isValidString(data.statusPembayaran, 1, 80) &&
+        isValidString(data.statusPenyewaan, 1, 80) &&
+        isOptionalString(data, 'tanggalPemesanan', 40) &&
+        isOptionalString(data, 'customerCloudId', 128) &&
+        isOptionalString(data, 'namaPelangganSnapshot', 300) &&
+        isOptionalString(data, 'unitCloudId', 128) &&
+        isOptionalString(data, 'namaUnitSnapshot', 250) &&
+        isOptionalString(data, 'kodeUnitSnapshot', 100) &&
+        isOptionalInt(data, 'hargaSewa') &&
+        isOptionalInt(data, 'durasiSewaBulan') &&
+        isOptionalInt(data, 'durasiHari') &&
+        isOptionalString(data, 'tanggalMulaiSewa', 40) &&
+        isOptionalString(data, 'tanggalAkhirSewa', 40) &&
+        isOptionalString(data, 'tanggalJatuhTempo', 40) &&
+        isOptionalInt(data, 'nominalPembayaran') &&
+        isOptionalInt(data, 'ongkir') &&
+        isOptionalInt(data, 'deposit') &&
+        isOptionalInt(data, 'diskon') &&
+        isOptionalString(data, 'metodePembayaran', 120) &&
+        isOptionalString(data, 'catatan', 5000) &&
+        isOptionalString(data, 'namaLokasiUsaha', 300) &&
+        isOptionalString(data, 'alamatLokasiGps', 2048) &&
+        isOptionalNumber(data, 'latitude') &&
+        isOptionalNumber(data, 'longitude') &&
+        isOptionalNumber(data, 'akurasiGpsMeter') &&
+        isOptionalString(data, 'linkGoogleMaps', 2048) &&
+        isOptionalString(data, 'jenisProgram', 80) &&
+        isOptionalInt(data, 'totalPeriodeHakMilik') &&
+        isOptionalInt(data, 'pembayaranKeHakMilik') &&
+        isOptionalString(data, 'statusProgramHakMilik', 80) &&
+        isOptionalString(data, 'isiPerjanjianSewaSnapshot', 10000) &&
+        isOptionalString(data, 'pdfInvoicePath', 2048);
+    }
+
+    function isValidTransactionUnitItem(data, userId) {
+      let requiredKeys = [
+        'userId', 'localId', 'transactionId', 'customerId', 'unitId', 'hargaSewa',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'localId', 'transactionId', 'transactionCloudId', 'customerId', 'unitId',
+        'unitIndexNumber', 'kodeUnitSnapshot', 'namaUnitSnapshot', 'jenisUnitSnapshot',
+        'merekSnapshot', 'kapasitasLiterSnapshot', 'jenisProgram', 'totalPeriodeHakMilik',
+        'pembayaranKeHakMilik', 'statusProgramHakMilik', 'hargaSewa', 'durasiHari',
+        'tanggalMulaiSewa', 'tanggalAkhirSewa', 'tanggalJatuhTempo', 'nominalPembayaran',
+        'statusPembayaran', 'statusPenyewaan', 'catatanUnit', 'periodeTagihan',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.localId is int && data.localId >= 0 &&
+        data.transactionId is int && data.customerId is int && data.unitId is int &&
+        data.hargaSewa is int && data.hargaSewa >= 0 &&
+        isOptionalString(data, 'transactionCloudId', 128) &&
+        isOptionalInt(data, 'unitIndexNumber') &&
+        isOptionalString(data, 'kodeUnitSnapshot', 100) &&
+        isOptionalString(data, 'namaUnitSnapshot', 250) &&
+        isOptionalString(data, 'jenisUnitSnapshot', 120) &&
+        isOptionalString(data, 'merekSnapshot', 150) &&
+        isOptionalInt(data, 'kapasitasLiterSnapshot') &&
+        isOptionalString(data, 'jenisProgram', 80) &&
+        isOptionalInt(data, 'totalPeriodeHakMilik') &&
+        isOptionalInt(data, 'pembayaranKeHakMilik') &&
+        isOptionalString(data, 'statusProgramHakMilik', 80) &&
+        isOptionalInt(data, 'durasiHari') &&
+        isOptionalString(data, 'tanggalMulaiSewa', 40) &&
+        isOptionalString(data, 'tanggalAkhirSewa', 40) &&
+        isOptionalString(data, 'tanggalJatuhTempo', 40) &&
+        isOptionalInt(data, 'nominalPembayaran') &&
+        isOptionalString(data, 'statusPembayaran', 80) &&
+        isOptionalString(data, 'statusPenyewaan', 80) &&
+        isOptionalString(data, 'catatanUnit', 3000) &&
+        isOptionalString(data, 'periodeTagihan', 80);
+    }
+
+    function isValidPaymentProof(data, userId) {
+      let requiredKeys = [
+        'userId', 'localId', 'transactionId', 'nominalPembayaran', 'metodePembayaran',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'localId', 'transactionId', 'transactionCloudId', 'tanggalPembayaran',
+        'nominalPembayaran', 'metodePembayaran', 'namaPengirim', 'catatanPembayaran',
+        'fotoBuktiUrl', 'waktuUpload', 'unitItemId', 'alokasiUnitJson',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.localId is int && data.localId >= 0 &&
+        data.transactionId is int &&
+        data.nominalPembayaran is int && data.nominalPembayaran >= 0 &&
+        isValidString(data.metodePembayaran, 1, 120) &&
+        isOptionalString(data, 'transactionCloudId', 128) &&
+        isOptionalString(data, 'tanggalPembayaran', 40) &&
+        isOptionalString(data, 'namaPengirim', 200) &&
+        isOptionalString(data, 'catatanPembayaran', 3000) &&
+        isOptionalString(data, 'fotoBuktiUrl', 2048) &&
+        isOptionalString(data, 'waktuUpload', 80) &&
+        isOptionalInt(data, 'unitItemId') &&
+        isOptionalString(data, 'alokasiUnitJson', 10000);
+    }
+
+    function isValidUnitPaymentAllocation(data, userId) {
+      let requiredKeys = [
+        'userId', 'localId', 'paymentProofId', 'transactionId', 'unitItemId', 'allocatedAmount',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'localId', 'paymentProofId', 'transactionId', 'unitItemId', 'customerId', 'unitId',
+        'namaUnitSnapshot', 'kodeUnitSnapshot', 'allocatedAmount', 'paymentDate', 'periodeTagihan',
+        'metodePembayaran', 'catatan', 'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.localId is int && data.localId >= 0 &&
+        data.paymentProofId is int && data.transactionId is int && data.unitItemId is int &&
+        data.allocatedAmount is int && data.allocatedAmount >= 0 &&
+        isOptionalInt(data, 'customerId') &&
+        isOptionalInt(data, 'unitId') &&
+        isOptionalString(data, 'namaUnitSnapshot', 250) &&
+        isOptionalString(data, 'kodeUnitSnapshot', 100) &&
+        isOptionalString(data, 'paymentDate', 40) &&
+        isOptionalString(data, 'periodeTagihan', 80) &&
+        isOptionalString(data, 'metodePembayaran', 120) &&
+        isOptionalString(data, 'catatan', 3000);
+    }
+
+    function isValidTransactionSignature(data, userId) {
+      let requiredKeys = [
+        'userId', 'localId', 'transactionId', 'customerId', 'signerRole',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'localId', 'transactionId', 'customerId', 'signerRole', 'signerName',
+        'signatureMethod', 'fileUrl', 'relativePath', 'hasTransparentBackground', 'signedDate',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.localId is int && data.localId >= 0 &&
+        data.transactionId is int && data.customerId is int &&
+        isValidString(data.signerRole, 1, 80) &&
+        isOptionalString(data, 'signerName', 200) &&
+        isOptionalString(data, 'signatureMethod', 60) &&
+        isOptionalString(data, 'fileUrl', 2048) &&
+        isOptionalString(data, 'relativePath', 1024) &&
+        isOptionalBool(data, 'hasTransparentBackground') &&
+        isOptionalString(data, 'signedDate', 60);
+    }
+
+    function isValidFreezerReturn(data, userId) {
+      let requiredKeys = [
+        'userId', 'localId', 'nomorDokumenPengembalian', 'transactionId', 'customerId', 'unitId',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'localId', 'nomorDokumenPengembalian', 'transactionId', 'nomorInvoiceSnapshot',
+        'customerId', 'namaPelangganSnapshot', 'unitId', 'kodeUnitSnapshot', 'namaUnitSnapshot',
+        'tanggalPengembalian', 'jamPengembalian', 'namaPetugasPenerima', 'kondisiUnitSaatKembali',
+        'catatanKondisiUnit', 'statusUnitSetelahKembali', 'pdfBuktiPengembalianPath',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.localId is int && data.localId >= 0 &&
+        data.transactionId is int && data.customerId is int && data.unitId is int &&
+        isValidString(data.nomorDokumenPengembalian, 1, 120) &&
+        isOptionalString(data, 'nomorInvoiceSnapshot', 120) &&
+        isOptionalString(data, 'namaPelangganSnapshot', 300) &&
+        isOptionalString(data, 'kodeUnitSnapshot', 100) &&
+        isOptionalString(data, 'namaUnitSnapshot', 250) &&
+        isOptionalString(data, 'tanggalPengembalian', 40) &&
+        isOptionalString(data, 'jamPengembalian', 40) &&
+        isOptionalString(data, 'namaPetugasPenerima', 200) &&
+        isOptionalString(data, 'kondisiUnitSaatKembali', 150) &&
+        isOptionalString(data, 'catatanKondisiUnit', 5000) &&
+        isOptionalString(data, 'statusUnitSetelahKembali', 100) &&
+        isOptionalString(data, 'pdfBuktiPengembalianPath', 2048);
+    }
+
+    function isValidPhotoMetadata(data, userId) {
+      let requiredKeys = [
+        'userId', 'ownerType', 'ownerLocalId', 'photoSlot', 'storagePath', 'uploadStatus',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'ownerType', 'ownerLocalId', 'ownerCloudId', 'photoSlot', 'localFilePath',
+        'storagePath', 'downloadUrl', 'thumbnailUrl', 'mimeType', 'bytesTotal', 'uploadStatus',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        data.ownerLocalId is int && data.ownerLocalId >= 0 &&
+        isValidString(data.ownerType, 1, 60) &&
+        isValidString(data.photoSlot, 1, 100) &&
+        isValidString(data.storagePath, 1, 1024) &&
+        isValidString(data.uploadStatus, 1, 40) &&
+        isOptionalString(data, 'ownerCloudId', 128) &&
+        isOptionalString(data, 'localFilePath', 2048) &&
+        isOptionalString(data, 'downloadUrl', 2048) &&
+        isOptionalString(data, 'thumbnailUrl', 2048) &&
+        isOptionalString(data, 'mimeType', 100) &&
+        isOptionalInt(data, 'bytesTotal');
+    }
+
+    function isValidCompanySettings(data, userId) {
+      let requiredKeys = [
+        'userId', 'namaPerusahaan', 'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'namaPerusahaan', 'alamat', 'nomorHp', 'email', 'instagram', 'facebook',
+        'identitasUsaha', 'informasiTambahan', 'ownerName', 'ownerSignatureUrl',
+        'perjanjianSewaText', 'paymentMethodsJson', 'smartNotifJson',
+        'clientUpdatedAtMillis', 'version', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        isValidSyncMeta(data, userId) &&
+        isValidString(data.namaPerusahaan, 1, 250) &&
+        isOptionalString(data, 'alamat', 1024) &&
+        isOptionalString(data, 'nomorHp', 80) &&
+        isOptionalString(data, 'email', 320) &&
+        isOptionalString(data, 'instagram', 150) &&
+        isOptionalString(data, 'facebook', 200) &&
+        isOptionalString(data, 'identitasUsaha', 500) &&
+        isOptionalString(data, 'informasiTambahan', 1000) &&
+        isOptionalString(data, 'ownerName', 200) &&
+        isOptionalString(data, 'ownerSignatureUrl', 2048) &&
+        isOptionalString(data, 'perjanjianSewaText', 10000) &&
+        isOptionalString(data, 'paymentMethodsJson', 20000) &&
+        isOptionalString(data, 'smartNotifJson', 5000);
+    }
+
+    function isValidMigrationState(data, userId) {
+      let requiredKeys = [
+        'userId', 'currentStep', 'status', 'clientUpdatedAtMillis', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'currentStep', 'stepLabel', 'status', 'processedItems', 'totalItems',
+        'localCustomersCount', 'cloudCustomersCount', 'localUnitsCount', 'cloudUnitsCount',
+        'localTxCount', 'cloudTxCount', 'localPhotosCount', 'cloudPhotosCount', 'lastError',
+        'clientUpdatedAtMillis', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        data.userId == userId &&
+        data.clientUpdatedAtMillis is int && data.clientUpdatedAtMillis >= 0 &&
+        data.currentStep is int && data.currentStep >= 0 && data.currentStep <= 10 &&
+        isValidString(data.status, 1, 60) &&
+        isOptionalString(data, 'stepLabel', 300) &&
+        isOptionalInt(data, 'processedItems') &&
+        isOptionalInt(data, 'totalItems') &&
+        isOptionalInt(data, 'localCustomersCount') &&
+        isOptionalInt(data, 'cloudCustomersCount') &&
+        isOptionalInt(data, 'localUnitsCount') &&
+        isOptionalInt(data, 'cloudUnitsCount') &&
+        isOptionalInt(data, 'localTxCount') &&
+        isOptionalInt(data, 'cloudTxCount') &&
+        isOptionalInt(data, 'localPhotosCount') &&
+        isOptionalInt(data, 'cloudPhotosCount') &&
+        isOptionalString(data, 'lastError', 2048);
+    }
+
+    function isValidBackupMetadata(data, userId) {
+      let requiredKeys = [
+        'userId', 'backupId', 'fileName', 'backupType', 'locationType',
+        'checksumSha256', 'fileSizeBytes', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'backupId', 'fileName', 'backupType', 'locationType', 'driveFileId',
+        'verificationStatus', 'checksumSha256', 'fileSizeBytes', 'isEncrypted',
+        'customerCount', 'unitCount', 'transactionCount', 'paymentCount', 'photoCount',
+        'databaseVersion', 'appVersion', 'createdAtDisplay', 'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        data.userId == userId &&
+        isValidString(data.backupId, 1, 128) &&
+        isValidString(data.fileName, 1, 300) &&
+        isValidString(data.backupType, 1, 60) &&
+        isValidString(data.locationType, 1, 40) &&
+        isValidString(data.checksumSha256, 32, 128) &&
+        data.fileSizeBytes is int && data.fileSizeBytes >= 0 &&
+        isOptionalString(data, 'driveFileId', 256) &&
+        isOptionalString(data, 'verificationStatus', 40) &&
+        isOptionalBool(data, 'isEncrypted') &&
+        isOptionalInt(data, 'customerCount') &&
+        isOptionalInt(data, 'unitCount') &&
+        isOptionalInt(data, 'transactionCount') &&
+        isOptionalInt(data, 'paymentCount') &&
+        isOptionalInt(data, 'photoCount') &&
+        isOptionalInt(data, 'databaseVersion') &&
+        isOptionalString(data, 'appVersion', 60) &&
+        isOptionalString(data, 'createdAtDisplay', 60);
+    }
+
+    function isValidBackupAuditLog(data, userId) {
+      let requiredKeys = [
+        'userId', 'actionType', 'status', 'timestampMillis', 'createdAt', 'updatedAt'
+      ];
+      let allowedKeys = [
+        'userId', 'actionType', 'status', 'fileName', 'checksum', 'recordCount',
+        'actorEmail', 'detailMessage', 'timestampDisplay', 'timestampMillis',
+        'createdAt', 'updatedAt'
+      ];
+      return data.keys().hasAll(requiredKeys) &&
+        data.keys().hasOnly(allowedKeys) &&
+        data.userId == userId &&
+        isValidString(data.actionType, 1, 60) &&
+        isValidString(data.status, 1, 40) &&
+        data.timestampMillis is int && data.timestampMillis >= 0 &&
+        isOptionalString(data, 'fileName', 300) &&
+        isOptionalString(data, 'checksum', 128) &&
+        isOptionalInt(data, 'recordCount') &&
+        isOptionalString(data, 'actorEmail', 320) &&
+        isOptionalString(data, 'detailMessage', 2048) &&
+        isOptionalString(data, 'timestampDisplay', 60);
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        hasValidTimestampsOnCreate(incoming());
+      allow update: if isOwner(userId) && isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        hasValidTimestampsOnUpdate(incoming());
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      match /customers/{customerId} {
+        allow get: if isOwner(userId) && isValidId(customerId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(customerId) &&
+          isValidCustomer(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(customerId) &&
+          isValidCustomer(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(customerId);
+      }
+
+      match /freezer_units/{unitId} {
+        allow get: if isOwner(userId) && isValidId(unitId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(unitId) &&
+          isValidFreezerUnit(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(unitId) &&
+          isValidFreezerUnit(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(unitId);
+      }
+
+      match /transactions/{transactionId} {
+        allow get: if isOwner(userId) && isValidId(transactionId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(transactionId) &&
+          isValidRentalTransaction(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(transactionId) &&
+          isValidRentalTransaction(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(transactionId);
+      }
+
+      match /transaction_unit_items/{itemId} {
+        allow get: if isOwner(userId) && isValidId(itemId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(itemId) &&
+          isValidTransactionUnitItem(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(itemId) &&
+          isValidTransactionUnitItem(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(itemId);
+      }
+
+      match /payment_proofs/{proofId} {
+        allow get: if isOwner(userId) && isValidId(proofId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(proofId) &&
+          isValidPaymentProof(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(proofId) &&
+          isValidPaymentProof(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(proofId);
+      }
+
+      match /unit_payment_allocations/{allocationId} {
+        allow get: if isOwner(userId) && isValidId(allocationId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(allocationId) &&
+          isValidUnitPaymentAllocation(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(allocationId) &&
+          isValidUnitPaymentAllocation(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(allocationId);
+      }
+
+      match /transaction_signatures/{signatureId} {
+        allow get: if isOwner(userId) && isValidId(signatureId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(signatureId) &&
+          isValidTransactionSignature(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(signatureId) &&
+          isValidTransactionSignature(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(signatureId);
+      }
+
+      match /freezer_returns/{returnId} {
+        allow get: if isOwner(userId) && isValidId(returnId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(returnId) &&
+          isValidFreezerReturn(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(returnId) &&
+          isValidFreezerReturn(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(returnId);
+      }
+
+      match /photo_metadata/{photoId} {
+        allow get: if isOwner(userId) && isValidId(photoId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(photoId) &&
+          isValidPhotoMetadata(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(photoId) &&
+          isValidPhotoMetadata(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(photoId);
+      }
+
+      match /company_settings/{settingId} {
+        allow get: if isOwner(userId) && isValidId(settingId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(settingId) &&
+          isValidCompanySettings(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(settingId) &&
+          isValidCompanySettings(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(settingId);
+      }
+
+      match /migration_state/{stateId} {
+        allow get: if isOwner(userId) && isValidId(stateId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(stateId) &&
+          isValidMigrationState(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(stateId) &&
+          isValidMigrationState(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(stateId);
+      }
+
+      match /backup_metadata/{backupId} {
+        allow get: if isOwner(userId) && isValidId(backupId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(backupId) &&
+          isValidBackupMetadata(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if isOwner(userId) && isValidId(backupId) &&
+          isValidBackupMetadata(incoming(), userId) &&
+          hasValidTimestampsOnUpdate(incoming());
+        allow delete: if isOwner(userId) && isValidId(backupId);
+      }
+
+      match /backup_audit_logs/{logId} {
+        allow get: if isOwner(userId) && isValidId(logId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(logId) &&
+          isValidBackupAuditLog(incoming(), userId) &&
+          hasValidTimestampsOnCreate(incoming());
+        allow update: if false;
+        allow delete: if isOwner(userId) && isValidId(logId);
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">SEWAin Aja Freezer SOC</string>
+    <string name="company_subtitle">FREEZER RENTAL MANAGEMENT SYSTEM - SOLO RAYA</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_units">Data Unit</string>
+    <string name="nav_customers">Pelanggan</string>
+    <string name="nav_transactions">Transaksi</string>
+    <string name="nav_reports">Laporan</string>
+    <string name="nav_settings">Pengaturan</string>
+    <string name="btn_take_location">AMBIL LOKASI SEKARANG</string>
+    <string name="btn_save_handover">SIMPAN SERAH TERIMA</string>
+    <string name="btn_generate_invoice">GENERATE INVOICE PDF</string>
+    <string name="btn_view_invoice">LIHAT INVOICE</string>
+    <string name="btn_download_pdf">DOWNLOAD PDF</string>
+    <string name="btn_share_whatsapp">BAGIKAN VIA WHATSAPP</string>
+    <string name="btn_print_invoice">CETAK INVOICE</string>
+    <string name="btn_resend_invoice">KIRIM ULANG INVOICE</string>
+    <string name="invoice_legal_statement">Dokumen ini merupakan bukti transaksi penyewaan unit freezer antara SEWAin Aja Freezer SOC dengan pelanggan yang tercantum dalam invoice.</string>
+</resources>

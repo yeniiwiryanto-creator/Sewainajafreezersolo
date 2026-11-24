@@ -1,0 +1,11 @@
+{
+  "name": "Remix SEWAin Aja Freezer SOC",
+  "description": "Freezer Rental Management System untuk mengelola operasional persewaan unit freezer, pelanggan, transaksi, serah terima foto \u0026 GPS, tanda tangan digital, invoice PDF, investasi, dan sinkronisasi Google Sheets di wilayah Solo Raya.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

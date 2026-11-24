@@ -1,0 +1,37 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Default deny catch-all: no public paths
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function isAllowedMedia() {
+      return request.resource != null &&
+        request.resource.size > 0 &&
+        request.resource.size <= 15 * 1024 * 1024 &&
+        (
+          request.resource.contentType.matches('image/.*') ||
+          request.resource.contentType == 'application/pdf'
+        );
+    }
+
+    // Structured user-scoped storage:
+    // /users/{userId}/customers/{customer_id}/ktp/...
+    // /users/{userId}/customers/{customer_id}/documentation/...
+    // /users/{userId}/customers/{customer_id}/location/...
+    // /users/{userId}/units/{unit_id}/photos/...
+    // /users/{userId}/transactions/{transaction_id}/payment_proofs/...
+    // /users/{userId}/transactions/{transaction_id}/documentation/...
+    // Strictly owner-scoped read, write, and hard-reset delete.
+    match /users/{userId}/{allUserPaths=**} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isAllowedMedia();
+      allow delete: if isOwner(userId);
+    }
+  }
+}
